@@ -287,3 +287,228 @@ describe('频道过滤', () => {
     expect(store.isTotallyEmpty).toBe(false)
   })
 })
+
+describe('计数与访客态归一化', () => {
+  it('保留后端给出的计数与访客态', async () => {
+    respondPosts([post({ id: 'a', likes: 3, favorites: 1, liked: true, favorited: true })])
+    const store = usePostsStore()
+
+    await store.load()
+
+    expect(store.posts[0]).toMatchObject({ likes: 3, favorites: 1, liked: true, favorited: true })
+  })
+
+  it('缺字段时补齐为 0 / false', async () => {
+    respondPosts([post({ id: 'a' })])
+    const store = usePostsStore()
+
+    await store.load()
+
+    expect(store.posts[0]).toMatchObject({ likes: 0, favorites: 0, liked: false, favorited: false })
+  })
+
+  it('负数、非数字、字符串布尔等脏值一律回退到安全值', async () => {
+    respondPosts([
+      post({ id: 'a', likes: -5, favorites: '很多', liked: 'yes', favorited: 1 }),
+      post({ id: 'b', likes: 2.7, favorites: '4', liked: 0, favorited: null })
+    ])
+    const store = usePostsStore()
+
+    await store.load()
+
+    const [first, second] = store.posts
+    expect(first).toMatchObject({ likes: 0, favorites: 0, liked: false, favorited: false })
+    expect(second.likes).toBe(2)
+    expect(second.favorites).toBe(4)
+    expect(second.liked).toBe(false)
+    expect(second.favorited).toBe(false)
+  })
+})
+
+describe('favoritesOnly 与 favoriteCount', () => {
+  beforeEach(respondPostsForFavorites)
+
+  /** 两条收藏散落在不同频道，用来验证「频道 + 收藏」叠加过滤 */
+  function respondPostsForFavorites() {
+    respondPosts([
+      post({ id: 'a', channel: 'shade', favorited: true, favorites: 2, createdAt: 3000 }),
+      post({ id: 'b', channel: 'night', favorited: true, favorites: 1, createdAt: 2000 }),
+      post({ id: 'c', channel: 'shade', favorited: false, createdAt: 1000 })
+    ])
+  }
+
+  it('favoriteCount 统计全部收藏（不受频道影响）', async () => {
+    const store = usePostsStore()
+    await store.load()
+    store.setChannel('night')
+
+    expect(store.favoriteCount).toBe(2)
+  })
+
+  it('开启后只保留已收藏，且仍受当前频道约束', async () => {
+    const store = usePostsStore()
+    await store.load()
+    store.setFavoritesOnly(true)
+
+    expect(store.visiblePosts.map((p) => p.id)).toEqual(['a', 'b'])
+
+    store.setChannel('shade')
+    expect(store.visiblePosts.map((p) => p.id)).toEqual(['a'])
+  })
+
+  it('默认关闭，setFavoritesOnly / toggleFavoritesOnly 可切换', async () => {
+    const store = usePostsStore()
+    await store.load()
+
+    expect(store.favoritesOnly).toBe(false)
+
+    store.setFavoritesOnly(true)
+    expect(store.favoritesOnly).toBe(true)
+    store.setFavoritesOnly(false)
+    expect(store.favoritesOnly).toBe(false)
+
+    store.toggleFavoritesOnly()
+    expect(store.favoritesOnly).toBe(true)
+    store.toggleFavoritesOnly()
+    expect(store.favoritesOnly).toBe(false)
+  })
+})
+
+describe('toggleLike', () => {
+  async function loadOne(overrides = {}) {
+    respondPosts([post({ id: 'a', likes: 1, favorites: 0, liked: false, favorited: false, ...overrides })])
+    const store = usePostsStore()
+    await store.load()
+    return store
+  }
+
+  it('乐观更新：请求返回前就已点赞并 +1，返回后采用服务端计数', async () => {
+    const store = await loadOne()
+    let resolveFetch
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve }))
+
+    const pending = store.toggleLike('a')
+
+    expect(store.posts[0].liked).toBe(true)
+    expect(store.posts[0].likes).toBe(2)
+
+    resolveFetch(jsonResponse({ post: post({ id: 'a', likes: 9, liked: true }) }))
+    expect(await pending).toBe(true)
+
+    expect(store.posts[0].likes).toBe(9)
+    expect(store.posts[0].liked).toBe(true)
+    expect(store.error).toBeNull()
+  })
+
+  it('已有的点赞可以取消，计数同步减 1', async () => {
+    const store = await loadOne({ likes: 5, liked: true })
+    let resolveFetch
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve }))
+
+    const pending = store.toggleLike('a')
+    expect(store.posts[0].liked).toBe(false)
+    expect(store.posts[0].likes).toBe(4)
+
+    resolveFetch(jsonResponse({ post: post({ id: 'a', likes: 4, liked: false }) }))
+    await pending
+
+    expect(store.posts[0].liked).toBe(false)
+    expect(store.posts[0].likes).toBe(4)
+  })
+
+  it('网络失败：回滚到原值并写中文 error', async () => {
+    const store = await loadOne({ likes: 5 })
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    expect(await store.toggleLike('a')).toBe(false)
+
+    expect(store.posts[0].liked).toBe(false)
+    expect(store.posts[0].likes).toBe(5)
+    expect(store.error).toContain('稍后再试')
+  })
+
+  it('404 失败：同样回滚，error 提示可重试', async () => {
+    const store = await loadOne({ likes: 5, liked: true })
+    failWith(404, 'NOT_FOUND', '这条声音不在了')
+
+    expect(await store.toggleLike('a')).toBe(false)
+
+    expect(store.posts[0].liked).toBe(true)
+    expect(store.posts[0].likes).toBe(5)
+    expect(store.error).toBeTruthy()
+    expect(store.error).toContain('稍后再试')
+  })
+
+  it('同一帖子请求进行中忽略重复点击，只发一次请求', async () => {
+    const store = await loadOne()
+    let resolveFetch
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve }))
+
+    const first = store.toggleLike('a')
+    expect(await store.toggleLike('a')).toBe(false)
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/posts/a/like').length).toBe(1)
+
+    resolveFetch(jsonResponse({ post: post({ id: 'a', likes: 2, liked: true }) }))
+    expect(await first).toBe(true)
+    expect(store.posts[0].likes).toBe(2)
+  })
+
+  it('帖子不存在时直接返回 false，不发请求', async () => {
+    const store = await loadOne()
+    const before = fetchMock.mock.calls.length
+
+    expect(await store.toggleLike('nope')).toBe(false)
+    expect(fetchMock.mock.calls.length).toBe(before)
+  })
+})
+
+describe('toggleFavorite', () => {
+  async function loadOne(overrides = {}) {
+    respondPosts([post({ id: 'a', likes: 0, favorites: 1, liked: false, favorited: false, ...overrides })])
+    const store = usePostsStore()
+    await store.load()
+    return store
+  }
+
+  it('乐观更新收藏态与计数，并让 favoriteCount 立即可见', async () => {
+    const store = await loadOne()
+    let resolveFetch
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve }))
+
+    const pending = store.toggleFavorite('a')
+
+    expect(store.posts[0].favorited).toBe(true)
+    expect(store.posts[0].favorites).toBe(2)
+    expect(store.favoriteCount).toBe(1)
+
+    resolveFetch(jsonResponse({ post: post({ id: 'a', favorites: 2, favorited: true }) }))
+    expect(await pending).toBe(true)
+
+    expect(store.posts[0].favorited).toBe(true)
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/posts/a/favorite').length).toBe(1)
+  })
+
+  it('失败回滚收藏态与计数', async () => {
+    const store = await loadOne({ favorited: true, favorites: 3 })
+    failWith(500)
+
+    expect(await store.toggleFavorite('a')).toBe(false)
+
+    expect(store.posts[0].favorited).toBe(true)
+    expect(store.posts[0].favorites).toBe(3)
+    expect(store.error).toBeTruthy()
+    expect(store.favoriteCount).toBe(1)
+  })
+
+  it('取消收藏后从「只看收藏」中消失', async () => {
+    const store = await loadOne({ favorited: true, favorites: 2 })
+    store.setFavoritesOnly(true)
+    expect(store.visiblePosts.map((p) => p.id)).toEqual(['a'])
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ post: post({ id: 'a', favorites: 1, favorited: false }) }))
+    await store.toggleFavorite('a')
+
+    expect(store.favoritesOnly).toBe(true)
+    expect(store.visiblePosts).toEqual([])
+  })
+})

@@ -1,4 +1,5 @@
 <script setup>
+import '../assets/interactions.css'
 import { computed } from 'vue'
 import { usePostsStore } from '../stores/posts'
 import PostCard from './PostCard.vue'
@@ -6,10 +7,17 @@ import PostCard from './PostCard.vue'
 const store = usePostsStore()
 
 const showEmpty = computed(() => store.visiblePosts.length === 0)
-const emptyTitle = computed(() => (store.isTotallyEmpty ? '这里还很安静' : '这个角落还很安静'))
-const emptyDesc = computed(() =>
-  store.isTotallyEmpty ? '说第一句吧，风会替你记着。' : '换个频道看看，或者在这里说第一句。'
-)
+
+// 收藏筛选下的空态要单独说，否则用户会以为自己把内容删掉了
+const emptyTitle = computed(() => {
+  if (store.favoritesOnly) return '还没有收藏'
+  return store.isTotallyEmpty ? '这里还很安静' : '这个角落还很安静'
+})
+
+const emptyDesc = computed(() => {
+  if (store.favoritesOnly) return '点亮留言上的收藏，它就会留在这里。'
+  return store.isTotallyEmpty ? '说第一句吧，风会替你记着。' : '换个频道看看，或者在这里说第一句。'
+})
 
 function retry() {
   store.load()
@@ -20,7 +28,21 @@ function retry() {
   <section class="timeline" aria-labelledby="timelineTitle">
     <div class="timeline__head">
       <h2 id="timelineTitle"><span class="timeline__dot" aria-hidden="true"></span>洞里的声音</h2>
-      <span class="timeline__hint">最新在前</span>
+      <div class="timeline__tools">
+        <span class="timeline__hint">最新在前</span>
+        <button
+          type="button"
+          class="favorites-toggle"
+          :class="{ 'is-active': store.favoritesOnly }"
+          :aria-pressed="store.favoritesOnly ? 'true' : 'false'"
+          @click="store.toggleFavoritesOnly()"
+        >
+          <svg class="favorites-toggle__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M7.4 4.6h9.2a1.2 1.2 0 0 1 1.2 1.2v13.9l-5.8-3.9-5.8 3.9V5.8a1.2 1.2 0 0 1 1.2-1.2Z" />
+          </svg>
+          只看收藏 · {{ store.favoriteCount }}
+        </button>
+      </div>
     </div>
 
     <p v-if="store.error" class="timeline__error" id="errorState" role="alert">
@@ -29,7 +51,13 @@ function retry() {
     </p>
 
     <ul class="post-list" id="postList">
-      <PostCard v-for="post in store.visiblePosts" :key="post.id" :post="post" />
+      <PostCard
+        v-for="post in store.visiblePosts"
+        :key="post.id"
+        :post="post"
+        @like="store.toggleLike"
+        @favorite="store.toggleFavorite"
+      />
     </ul>
 
     <div class="empty" id="emptyState" :hidden="!showEmpty">

@@ -20,6 +20,13 @@ function isValidChannel(id) {
   return CHANNELS.some((channel) => channel.id === id)
 }
 
+/** 计数只接受非负数字，非法值（负数 / NaN / 对象）一律回退 0 */
+function toCount(value) {
+  const num = typeof value === 'number' ? value : Number.parseFloat(value)
+  if (!Number.isFinite(num) || num <= 0) return 0
+  return Math.floor(num)
+}
+
 /** 把服务端/历史数据规范成安全结构，非法条目返回 null */
 function normalizePost(item) {
   if (!item || typeof item !== 'object') return null
@@ -30,7 +37,48 @@ function normalizePost(item) {
     id: String(item.id),
     content: item.content.slice(0, MAX_LENGTH),
     createdAt: item.createdAt,
-    channel: isValidChannel(item.channel) ? item.channel : DEFAULT_CHANNEL
+    channel: isValidChannel(item.channel) ? item.channel : DEFAULT_CHANNEL,
+    likes: toCount(item.likes),
+    favorites: toCount(item.favorites),
+    // 访客态必须是严格布尔，避免后端返回 0/1 时把样式和 aria 弄错
+    liked: item.liked === true,
+    favorited: item.favorited === true
+  }
+}
+
+/** 在途的互动请求（`${id}:like` / `${id}:favorite`），用于吞掉连点 */
+const inFlight = new Set()
+
+/**
+ * 点赞 / 收藏共用的乐观切换：先改本地再请求，成功用服务端结果校准，失败整体回滚。
+ * 同一帖子同一动作在途时直接忽略，否则连点会把计数打成负数。
+ */
+async function toggleReaction(store, post, { pendingKey, stateKey, countKey, request }) {
+  if (inFlight.has(pendingKey)) return false
+  inFlight.add(pendingKey)
+
+  const snapshotState = post[stateKey]
+  const snapshotCount = post[countKey]
+
+  post[stateKey] = !snapshotState
+  post[countKey] = Math.max(0, snapshotCount + (post[stateKey] ? 1 : -1))
+  store.error = null
+
+  try {
+    const updated = normalizePost(await request())
+    if (updated) {
+      post[stateKey] = updated[stateKey]
+      post[countKey] = updated[countKey]
+    }
+    return true
+  } catch (error) {
+    post[stateKey] = snapshotState
+    post[countKey] = snapshotCount
+    console.warn('[树洞] 互动操作失败，已回滚。', error)
+    store.error = toReadableError(error)
+    return false
+  } finally {
+    inFlight.delete(pendingKey)
   }
 }
 
@@ -49,17 +97,26 @@ export const usePostsStore = defineStore('posts', {
     posts: [],
     activeChannel: 'all',
     composerChannel: DEFAULT_CHANNEL,
+    // 「只看收藏」是纯前端视图开关，不进后端
+    favoritesOnly: false,
     loading: false,
     publishing: false,
     error: null
   }),
 
   getters: {
-    /** 当前频道下可见的帖子（倒序） */
+    /** 当前频道下可见的帖子（倒序）；开启收藏筛选后再收窄一层 */
     visiblePosts(state) {
-      if (state.activeChannel === 'all') return state.posts
-      return state.posts.filter((post) => post.channel === state.activeChannel)
+      const byChannel =
+        state.activeChannel === 'all'
+          ? state.posts
+          : state.posts.filter((post) => post.channel === state.activeChannel)
+
+      if (!state.favoritesOnly) return byChannel
+      return byChannel.filter((post) => post.favorited)
     },
+    /** 收藏总数跨频道统计，供筛选按钮展示 */
+    favoriteCount: (state) => state.posts.filter((post) => post.favorited).length,
     totalCount: (state) => state.posts.length,
     channelCount() {
       return this.visiblePosts.length
@@ -132,6 +189,40 @@ export const usePostsStore = defineStore('posts', {
       } finally {
         this.publishing = false
       }
+    },
+
+    /** 切换点赞：乐观更新 + 失败回滚，返回是否成功 */
+    async toggleLike(id) {
+      const post = this.posts.find((item) => item.id === String(id))
+      if (!post) return false
+
+      return toggleReaction(this, post, {
+        pendingKey: `${post.id}:like`,
+        stateKey: 'liked',
+        countKey: 'likes',
+        request: () => postsApi.toggleLike(post.id)
+      })
+    },
+
+    /** 切换收藏：语义与点赞一致 */
+    async toggleFavorite(id) {
+      const post = this.posts.find((item) => item.id === String(id))
+      if (!post) return false
+
+      return toggleReaction(this, post, {
+        pendingKey: `${post.id}:favorite`,
+        stateKey: 'favorited',
+        countKey: 'favorites',
+        request: () => postsApi.toggleFavorite(post.id)
+      })
+    },
+
+    setFavoritesOnly(value) {
+      this.favoritesOnly = Boolean(value)
+    },
+
+    toggleFavoritesOnly() {
+      this.favoritesOnly = !this.favoritesOnly
     },
 
     setChannel(id) {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createPostsApi, postsApi, ApiError } from '../../src/api/posts'
+import { getVisitorId } from '../../src/utils/visitor'
 
 let fetchMock
 let api
@@ -152,5 +153,101 @@ describe('createPostsApi / 错误处理', () => {
     await postsApi.list()
 
     expect(stub).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('createPostsApi / 访客标识', () => {
+  it('getVisitorId 惰性生成一次，长度落在服务端接受范围内', () => {
+    const first = getVisitorId()
+
+    expect(typeof first).toBe('string')
+    expect(first.length).toBeGreaterThan(0)
+    expect(first.length).toBeLessThanOrEqual(64)
+    expect(getVisitorId()).toBe(first)
+  })
+
+  it('list / create / remove 都带同一个 X-Visitor-Id', async () => {
+    fetchMock.mockResolvedValueOnce(response({ posts: [] }))
+    await api.list()
+
+    fetchMock.mockResolvedValueOnce(response({ post: { id: '1', content: 'x', createdAt: 1, channel: 'shade' } }, 201))
+    await api.create({ content: 'x', channel: 'shade' })
+
+    fetchMock.mockResolvedValueOnce(response(null, 204))
+    await api.remove('1')
+
+    const visitorIds = fetchMock.mock.calls.map(([, init]) => init.headers['X-Visitor-Id'])
+    expect(visitorIds[0]).toBeTruthy()
+    expect(visitorIds[1]).toBe(visitorIds[0])
+    expect(visitorIds[2]).toBe(visitorIds[0])
+  })
+})
+
+describe('createPostsApi / toggleLike 与 toggleFavorite', () => {
+  function toggledPost(overrides = {}) {
+    return { id: 'p-1', content: '你好', createdAt: 1, channel: 'shade', likes: 4, favorites: 2, liked: true, favorited: false, ...overrides }
+  }
+
+  it('toggleLike POST /api/posts/:id/like，返回归一化的 post', async () => {
+    const post = toggledPost()
+    fetchMock.mockResolvedValueOnce(response({ post }))
+
+    const result = await api.toggleLike('p-1')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/posts/p-1/like')
+    expect(init.method).toBe('POST')
+    expect(init.headers['X-Visitor-Id']).toBeTruthy()
+    expect(result).toEqual(post)
+  })
+
+  it('toggleFavorite POST /api/posts/:id/favorite，返回归一化的 post', async () => {
+    const post = toggledPost({ favorited: true, favorites: 3 })
+    fetchMock.mockResolvedValueOnce(response({ post }))
+
+    const result = await api.toggleFavorite('p-1')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/posts/p-1/favorite')
+    expect(init.method).toBe('POST')
+    expect(result).toEqual(post)
+  })
+
+  it('id 会被 URL 编码', async () => {
+    fetchMock.mockResolvedValueOnce(response({ post: toggledPost() }))
+
+    await api.toggleLike('a/b c')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/posts/a%2Fb%20c/like')
+  })
+
+  it('404 时抛 ApiError，带上服务端中文文案与 code', async () => {
+    fetchMock.mockResolvedValueOnce(response({ error: { code: 'NOT_FOUND', message: '这条声音不在了' } }, 404))
+
+    const error = await api.toggleFavorite('gone').catch((err) => err)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.status).toBe(404)
+    expect(error.code).toBe('NOT_FOUND')
+    expect(error.message).toBe('这条声音不在了')
+  })
+
+  it('网络异常统一为 NETWORK_ERROR', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    const error = await api.toggleLike('p-1').catch((err) => err)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.status).toBe(0)
+    expect(error.code).toBe('NETWORK_ERROR')
+  })
+
+  it('响应缺少 post 字段时抛 BAD_RESPONSE', async () => {
+    fetchMock.mockResolvedValueOnce(response({ ok: true }))
+
+    const error = await api.toggleLike('p-1').catch((err) => err)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.code).toBe('BAD_RESPONSE')
   })
 })

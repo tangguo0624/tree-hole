@@ -1,0 +1,206 @@
+/* ==========================================================================
+   树洞 · 互动样式（点赞 / 收藏 / 只看收藏）
+   单独成文件，避免与 styles.css 并行改动冲突；令牌沿用 :root 里的森绿系。
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   卡片底部操作区
+   -------------------------------------------------------------------------- */
+.post__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: nowrap;
+}
+
+.post__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 9px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--leaf-700, #3E6B34);
+  background: var(--leaf-050, #F1F8E4);
+  border: 1px solid rgba(110, 156, 85, 0.42);
+  border-radius: var(--radius-pill, 999px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.2s var(--ease, ease), color 0.2s var(--ease, ease), background 0.2s var(--ease, ease),
+    border-color 0.2s var(--ease, ease), box-shadow 0.2s var(--ease, ease);
+}
+
+.post__action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(110, 156, 85, 0.78);
+  box-shadow: 0 10px 16px -12px rgba(43, 79, 38, 0.8);
+}
+
+.post__action:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.post__action:focus-visible {
+  outline: 2px solid rgba(110, 156, 85, 0.55);
+  outline-offset: 2px;
+}
+
+.post__action-icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s var(--ease, ease), fill 0.2s var(--ease, ease);
+}
+
+.post__action-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* 激活态整体微微放大，计数加粗，让「我做过这件事」一眼可见 */
+.post__action.is-active {
+  transform: scale(1.04);
+}
+
+.post__action.is-active .post__action-icon {
+  fill: currentColor;
+  transform: scale(1.08);
+}
+
+.post__action.is-active .post__action-count {
+  font-weight: 700;
+}
+
+/* 点赞：暖珊瑚 */
+.post__action--like.is-active {
+  color: #C2573C;
+  background: rgba(214, 138, 92, 0.14);
+  border-color: rgba(194, 87, 60, 0.45);
+}
+
+/* 收藏：琥珀绿 */
+.post__action--favorite.is-active {
+  color: #7C8B33;
+  background: rgba(176, 196, 120, 0.22);
+  border-color: rgba(124, 139, 51, 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   标题栏：只看收藏
+   -------------------------------------------------------------------------- */
+.timeline__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.favorites-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--leaf-700, #3E6B34);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(168, 204, 139, 0.7);
+  border-radius: var(--radius-pill, 999px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.2s var(--ease, ease), color 0.2s var(--ease, ease), background 0.2s var(--ease, ease),
+    border-color 0.2s var(--ease, ease), box-shadow 0.2s var(--ease, ease);
+}
+
+.favorites-toggle__icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  transition: fill 0.2s var(--ease, ease);
+}
+
+.favorites-toggle:hover {
+  transform: translateY(-1px);
+  background: var(--leaf-050, #F1F8E4);
+  border-color: rgba(110, 156, 85, 0.85);
+}
+
+.favorites-toggle:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.favorites-toggle:focus-visible {
+  outline: 2px solid rgba(110, 156, 85, 0.55);
+  outline-offset: 2px;
+}
+
+.favorites-toggle.is-active {
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #6E9C55 0%, #3E6B34 100%);
+  border-color: transparent;
+  box-shadow: 0 10px 18px -12px rgba(62, 107, 52, 0.9);
+}
+
+.favorites-toggle.is-active .favorites-toggle__icon {
+  fill: currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   移动端：保持单行，宁可缩小内边距也不换行溢出
+   -------------------------------------------------------------------------- */
+@media (max-width: 480px) {
+  .timeline__head {
+    gap: 8px;
+  }
+
+  .timeline__head h2 {
+    min-width: 0;
+    font-size: 15px;
+  }
+
+  .timeline__hint {
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+  }
+
+  .timeline__tools {
+    gap: 6px;
+    flex: none;
+  }
+
+  .favorites-toggle {
+    padding: 3px 9px;
+    font-size: 11.5px;
+  }
+
+  .favorites-toggle__icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .post__action {
+    padding: 3px 9px 3px 7px;
+    font-size: 12px;
+    gap: 5px;
+  }
+
+  .post__action-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
