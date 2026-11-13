@@ -45,6 +45,16 @@
     </header>
 
     <main>
+      <nav class="feedbar" aria-label="频道切换">
+        <div class="feedbar__tabs" role="tablist">
+          <button class="feedbar__tab is-active" type="button" role="tab" aria-selected="true" data-channel="all">全部</button>
+          <button class="feedbar__tab" type="button" role="tab" aria-selected="false" data-channel="shade">树荫</button>
+          <button class="feedbar__tab" type="button" role="tab" aria-selected="false" data-channel="night">深夜</button>
+          <button class="feedbar__tab" type="button" role="tab" aria-selected="false" data-channel="breeze">微风</button>
+        </div>
+        <span class="feedbar__count" id="feedCount" aria-live="polite">0 条</span>
+      </nav>
+
       <form class="composer" id="composerForm" novalidate>
         <div class="composer__head">
           <span class="composer__avatar" aria-hidden="true">
@@ -53,6 +63,13 @@
             </svg>
           </span>
           <label class="composer__label" for="postContent">这一刻，想说什么？</label>
+        </div>
+
+        <div class="composer__channels" role="group" aria-label="选择投向的频道">
+          <span class="composer__channels-label">投向</span>
+          <button class="chip is-active" type="button" data-channel="shade">树荫</button>
+          <button class="chip" type="button" data-channel="night">深夜</button>
+          <button class="chip" type="button" data-channel="breeze">微风</button>
         </div>
 
         <textarea id="postContent" name="content" rows="3" maxlength="300"
@@ -95,8 +112,8 @@
               <circle cx="82" cy="38" r="17" fill="#A8CC8B" opacity="0.7"/>
             </svg>
           </div>
-          <h3>这里还很安静</h3>
-          <p>说第一句吧，风会替你记着。</p>
+          <h3 id="emptyTitle">这里还很安静</h3>
+          <p id="emptyDesc">说第一句吧，风会替你记着。</p>
         </div>
       </section>
     </main>

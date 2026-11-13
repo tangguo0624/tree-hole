@@ -14,6 +14,9 @@
   var HOUR = 60 * MINUTE;
   var DAY = 24 * HOUR;
 
+  var CHANNELS = { shade: '树荫', night: '深夜', breeze: '微风' };
+  var DEFAULT_CHANNEL = 'shade';
+
   var els = {
     form: document.getElementById('composerForm'),
     input: document.getElementById('postContent'),
@@ -24,12 +27,19 @@
     count: document.getElementById('voiceCount'),
     toast: document.getElementById('toast'),
     dock: document.querySelector('.dock'),
-    about: document.getElementById('about')
+    about: document.getElementById('about'),
+    feedbar: document.querySelector('.feedbar'),
+    feedCount: document.getElementById('feedCount'),
+    chips: document.querySelectorAll('.composer__channels .chip'),
+    emptyTitle: document.getElementById('emptyTitle'),
+    emptyDesc: document.getElementById('emptyDesc')
   };
 
   var posts = [];
   var toastTimer = null;
   var storageBroken = false;
+  var activeChannel = 'all';
+  var composerChannel = DEFAULT_CHANNEL;
 
   /* ---------------------------------------------------------------- Store */
 
@@ -47,7 +57,8 @@
     return {
       id: item.id ? String(item.id) : createId(),
       content: item.content.slice(0, MAX_LENGTH),
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      channel: CHANNELS[item.channel] ? item.channel : DEFAULT_CHANNEL
     };
   }
 
@@ -124,12 +135,22 @@
     time.dateTime = new Date(post.createdAt).toISOString();
     time.textContent = formatRelativeTime(post.createdAt);
 
+    var meta = document.createElement('div');
+    meta.className = 'post__meta';
+
+    var channel = document.createElement('span');
+    channel.className = 'post__channel';
+    channel.textContent = CHANNELS[post.channel] || CHANNELS[DEFAULT_CHANNEL];
+
+    meta.appendChild(channel);
+    meta.appendChild(time);
+
     var content = document.createElement('p');
     content.className = 'post__content';
     /* textContent 输出，天然防止 HTML 注入 */
     content.textContent = post.content;
 
-    body.appendChild(time);
+    body.appendChild(meta);
     body.appendChild(content);
     item.appendChild(avatar);
     item.appendChild(body);
@@ -137,14 +158,33 @@
   }
 
   function renderList() {
+    var visible = activeChannel === 'all'
+      ? posts
+      : posts.filter(function (post) { return post.channel === activeChannel; });
+
     var fragment = document.createDocumentFragment();
-    posts.forEach(function (post) {
+    visible.forEach(function (post) {
       fragment.appendChild(buildPostNode(post));
     });
 
     els.list.replaceChildren(fragment);
-    els.empty.hidden = posts.length > 0;
+
+    if (posts.length === 0) {
+      els.empty.hidden = false;
+      els.emptyTitle.textContent = '这里还很安静';
+      els.emptyDesc.textContent = '说第一句吧，风会替你记着。';
+    } else if (visible.length === 0) {
+      els.empty.hidden = false;
+      els.emptyTitle.textContent = '这个角落还很安静';
+      els.emptyDesc.textContent = '换个频道看看，或者在这里说第一句。';
+    } else {
+      els.empty.hidden = true;
+    }
+
     els.count.textContent = String(posts.length);
+    if (els.feedCount) {
+      els.feedCount.textContent = visible.length + ' 条';
+    }
 
     var nodes = els.list.children;
     for (var i = 0; i < nodes.length; i += 1) {
@@ -194,7 +234,8 @@
     var post = {
       id: createId(),
       content: content.slice(0, MAX_LENGTH),
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      channel: composerChannel
     };
 
     posts.unshift(post);
@@ -211,6 +252,37 @@
 
   function handleScrollState() {
     document.body.classList.toggle('is-scrolled', window.scrollY > 80);
+  }
+
+  function initFeedbar() {
+    if (!els.feedbar) return;
+
+    els.feedbar.addEventListener('click', function (event) {
+      var tab = event.target.closest('.feedbar__tab');
+      if (!tab) return;
+
+      activeChannel = tab.dataset.channel;
+      var tabs = els.feedbar.querySelectorAll('.feedbar__tab');
+      for (var i = 0; i < tabs.length; i += 1) {
+        var isActive = tabs[i] === tab;
+        tabs[i].classList.toggle('is-active', isActive);
+        tabs[i].setAttribute('aria-selected', isActive ? 'true' : 'false');
+      }
+      renderList();
+    });
+  }
+
+  function initComposerChips() {
+    for (var i = 0; i < els.chips.length; i += 1) {
+      (function (chip) {
+        chip.addEventListener('click', function () {
+          composerChannel = chip.dataset.channel;
+          for (var j = 0; j < els.chips.length; j += 1) {
+            els.chips[j].classList.toggle('is-active', els.chips[j] === chip);
+          }
+        });
+      })(els.chips[i]);
+    }
   }
 
   function initDock() {
@@ -260,6 +332,8 @@
       }
     });
 
+    initFeedbar();
+    initComposerChips();
     initDock();
 
     window.setInterval(refreshTimes, MINUTE);
