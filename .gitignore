@@ -20,3 +20,7 @@ Desktop.ini
 # 依赖与构建产物（本项目零依赖，仅为防止误提交）
 node_modules/
 dist/
+
+# 本地代理链接目录（安装 skills 生成的 Junction，不入库）
+.claude/
+agent/
