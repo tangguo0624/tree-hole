@@ -25,3 +25,6 @@ dist/
 # 本地代理链接目录（安装 skills 生成的 Junction，不入库）
 .claude/
 agent/
+
+# 本地验收与交接文档（保留在本机，不入库）
+docs/
