@@ -9,21 +9,25 @@ const toast = useToastStore()
 const draft = ref('')
 
 const charCount = computed(() => draft.value.length)
-const canSubmit = computed(() => draft.value.trim().length > 0)
+const submitting = computed(() => store.publishing)
+const canSubmit = computed(() => draft.value.trim().length > 0 && !submitting.value)
 const counterText = computed(() => `${charCount.value} / ${MAX_LENGTH}`)
 
 function selectChannel(id) {
   store.setComposerChannel(id)
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   if (!canSubmit.value) return
 
-  const published = store.publish(draft.value)
-  if (!published) return
+  const published = await store.publish(draft.value)
+  if (!published) {
+    toast.show('保存失败，请稍后再试')
+    return
+  }
 
   draft.value = ''
-  toast.show(store.storageBroken ? '已投进树洞（未写入本地存储）' : '已投进树洞，叶子替你说完了')
+  toast.show('已投进树洞，叶子替你说完了')
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 </script>

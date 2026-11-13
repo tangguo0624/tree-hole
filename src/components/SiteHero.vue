@@ -8,7 +8,7 @@ const store = usePostsStore()
   <header class="hero">
     <p class="hero__badge">
       <span class="hero__badge-dot" aria-hidden="true"></span>
-      匿名 · 只存在本地
+      匿名 · 只说给树洞听
     </p>
 
     <div class="hero__title-wrap">

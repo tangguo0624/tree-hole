@@ -1,12 +1,20 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ChannelBar from '../../src/components/ChannelBar.vue'
 import { usePostsStore } from '../../src/stores/posts'
+import { createFakeBackend } from '../helpers/fakeBackend'
+
+let backend
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  localStorage.clear()
+  backend = createFakeBackend()
+  vi.stubGlobal('fetch', vi.fn(backend.fetchImpl))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('ChannelBar 组件', () => {
@@ -39,10 +47,10 @@ describe('ChannelBar 组件', () => {
     const store = usePostsStore()
 
     store.setComposerChannel('shade')
-    store.publish('白天的一条')
+    await store.publish('白天的一条')
     store.setComposerChannel('night')
-    store.publish('黑夜的一条')
-    await Promise.resolve()
+    await store.publish('黑夜的一条')
+    await flushPromises()
 
     expect(wrapper.find('#feedCount').text()).toBe('2 条')
 

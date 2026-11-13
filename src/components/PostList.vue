@@ -10,6 +10,10 @@ const emptyTitle = computed(() => (store.isTotallyEmpty ? '这里还很安静' :
 const emptyDesc = computed(() =>
   store.isTotallyEmpty ? '说第一句吧，风会替你记着。' : '换个频道看看，或者在这里说第一句。'
 )
+
+function retry() {
+  store.load()
+}
 </script>
 
 <template>
@@ -18,6 +22,11 @@ const emptyDesc = computed(() =>
       <h2 id="timelineTitle"><span class="timeline__dot" aria-hidden="true"></span>洞里的声音</h2>
       <span class="timeline__hint">最新在前</span>
     </div>
+
+    <p v-if="store.error" class="timeline__error" id="errorState" role="alert">
+      {{ store.error }}
+      <button class="timeline__retry" type="button" @click="retry">再试一次</button>
+    </p>
 
     <ul class="post-list" id="postList">
       <PostCard v-for="post in store.visiblePosts" :key="post.id" :post="post" />

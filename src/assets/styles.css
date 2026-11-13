@@ -489,6 +489,37 @@ body {
   color: var(--ink-400);
 }
 
+.timeline__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(214, 138, 92, 0.1);
+  border: 1px solid rgba(214, 138, 92, 0.22);
+  font-size: 13px;
+  color: #8a5a34;
+}
+
+.timeline__retry {
+  padding: 4px 12px;
+  border: 1px solid rgba(110, 156, 85, 0.45);
+  border-radius: 999px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--green-600, #4f7b3d);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.timeline__retry:hover {
+  background: var(--green-600, #4f7b3d);
+  color: #fff;
+}
+
 .post-list {
   display: grid;
   gap: 14px;

@@ -8,7 +8,11 @@ import AppDock from './components/AppDock.vue'
 import AppToast from './components/AppToast.vue'
 
 const store = usePostsStore()
-store.load()
+
+// load 内部已降级处理，这里再兜底一次，避免未处理的 rejection
+store.load().catch((error) => {
+  console.warn('[树洞] 首次加载失败。', error)
+})
 </script>
 
 <template>
@@ -31,8 +35,8 @@ store.load()
     </main>
 
     <footer class="site-footer" id="about">
-      <p>内容仅保存在此设备的浏览器中，不会上传到任何地方。</p>
-      <p class="site-footer__meta">Tree Hole · Vue 3 / Pinia / LocalStorage</p>
+      <p>内容保存在树洞的小屋里，不会同步到任何社交平台。</p>
+      <p class="site-footer__meta">Tree Hole · Vue 3 / Pinia / Hono REST</p>
     </footer>
   </div>
 
