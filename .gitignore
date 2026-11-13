@@ -16,6 +16,7 @@ Desktop.ini
 *.tmp
 *.bak
 ~$*
+vitest-out.txt
 
 # 依赖与构建产物（本项目零依赖，仅为防止误提交）
 node_modules/
