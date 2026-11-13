@@ -1,8 +1,13 @@
 # 树洞 · Tree Hole
 
-> 把心事说给树听。
+> 把心事交给安静的风。
 
-一个使用**原生 HTML + CSS + JavaScript** 实现的极简匿名留言小站。写下此刻的心事，投进树洞，按时间倒序静静陈列；所有内容只保存在你自己浏览器的 `LocalStorage` 里，不联网、不上传、没有账号体系。
+一个匿名心事发布小站。本仓库包含两个版本：
+
+- **Vue 版（当前主版本）**：Node.js + Vue 3 + Pinia + Vite，以 **TDD** 方式构建，数据仍使用浏览器 `LocalStorage` 持久化；
+- **纯静态版（`legacy-static/`）**：最初的作业交付物，原生 HTML/CSS/JavaScript，双击即可运行，无任何构建与依赖。
+
+页面与代码中不出现任何第三方社交平台名称，统一使用「树洞 / Tree Hole」。
 
 ---
 
@@ -10,11 +15,11 @@
 
 | 能力 | 说明 |
 | --- | --- |
-| 发布 | 多行输入 + 「投进树洞」按钮，空白内容不可提交，上限 300 字并实时计数，支持 `Ctrl + Enter` 快捷发布 |
+| 发布 | 多行输入 + 「投进树洞」按钮，空白内容不可提交，上限 300 字并实时计数（接近上限变橙红），支持 `Ctrl + Enter` 快捷发布 |
+| 频道 | 发布时选择投向「树荫 / 深夜 / 微风」，顶栏页签（全部 + 各频道）可切换过滤，卡片上展示频道徽标 |
 | 浏览 | 时间线按发布先后**倒序**展示，每条包含匿名标识、正文（保留换行）与相对时间（刚刚 / x 分钟前 / x 小时前 / x 天前 / 具体日期） |
 | 本地持久化 | 数据写入浏览器 `LocalStorage`，刷新或重新打开页面内容仍在 |
-| 容错 | 本地数据损坏或 `LocalStorage` 不可用时自动降级为空列表并给出柔和提示，不会白屏 |
-| 频道 | 发布时选择投向「树荫 / 深夜 / 微风」，顶栏页签（全部 + 各频道）可切换过滤，卡片上展示频道徽标 |
+| 容错 | 本地数据损坏或存储不可用时自动降级为空列表并给出柔和提示，不会白屏 |
 | 空状态 | 无内容时展示树影插画与引导文案；某频道暂无内容时提示切换频道 |
 | 响应式 | 移动优先，桌面与手机（≤480px）自适应 |
 | 快捷导航 | 滚动后浮现底部悬浮栏：回到洞顶 / 写一条（聚焦输入框）/ 关于 |
@@ -22,48 +27,82 @@
 ## 界面设计
 
 - **品牌头部**：超大圆体「树洞」渐变字 + 手绘感下划线，副标题「把心事交给安静的风」，下方胶囊显示已收下的声音条数。
+- **频道顶栏**：绿底白字 App 式页签，当前频道白色胶囊高亮，右侧实时显示当前频道条数。
 - **发布卡片**：便签式浅绿输入区，聚焦时白底 + 绿色光晕；右下渐变胶囊按钮带纸飞机图标与扫光动效。
-- **卡片流**：白色大圆角卡片、叶脉纹理头像、右上浅绿时间胶囊，hover 轻微上浮。
-- **氛围**：三层柔光色块缓慢漂移，右上/左侧漂浮叶片轻微摆动，整体保持克制留白。
-- **动效**：卡片错峰淡入、按钮扫光、头像微旋转，均遵循 `prefers-reduced-motion`。
+- **卡片流**：白色大圆角卡片、叶脉纹理头像、右上浅绿时间与频道胶囊，hover 轻微上浮。
+- **氛围**：三层柔光色块缓慢漂移，漂浮叶片轻微摆动；动效均遵循 `prefers-reduced-motion`。
 
-## 运行方式
+## 运行方式（Vue 版）
 
-无需安装任何依赖，二选一：
+```powershell
+npm install        # 安装依赖
+npm run dev        # 开发服务器（Vite）
+npm run test       # 运行全部测试（Vitest）
+npm run build      # 构建产物到 dist/
+npm run preview    # 预览构建产物
+```
 
-1. **直接打开**：双击 `index.html`，用浏览器打开即可。
-2. **本地静态服务**（推荐，行为最接近真实部署）：
-
-   ```powershell
-   # 任选一种，然后访问 http://localhost:8000
-   python -m http.server 8000
-   npx serve .
-   ```
+旧静态版无需安装：直接双击 `legacy-static/index.html`。
 
 ## 目录结构
 
 ```
 .
-├── index.html              # 页面结构：品牌头部、发布表单、时间线、空状态、页脚
-├── assets/
-│   ├── css/
-│   │   └── styles.css      # 森绿主题：设计令牌、渐变背景、卡片、按钮态、动效、响应式
-│   └── js/
-│       └── app.js          # 逻辑：存储适配、渲染、相对时间、事件控制
-├── README.md
-└── .gitignore
+├── index.html                 # Vite 入口
+├── package.json / vite.config.js / vitest.config.js
+├── src/
+│   ├── main.js                # 创建应用，挂载 Pinia
+│   ├── App.vue                # 布局骨架：背景装饰 / 品牌 / 频道栏 / 发布区 / 时间线 / 页脚
+│   ├── assets/styles.css      # 森绿主题样式（沿用旧版设计令牌）
+│   ├── stores/
+│   │   ├── posts.js           # 帖子状态：读取/校验/降级、发布、频道过滤（Pinia）
+│   │   └── toast.js           # 轻提示状态与自动隐藏
+│   ├── components/
+│   │   ├── SiteHero.vue       # 品牌头部
+│   │   ├── ChannelBar.vue     # 频道页签
+│   │   ├── Composer.vue       # 发布表单（字数 / 频道 / 快捷键）
+│   │   ├── PostList.vue       # 时间线与空状态
+│   │   ├── PostCard.vue       # 单条留言卡片（纯 props 组件，不依赖 store）
+│   │   ├── AppDock.vue        # 底部悬浮导航
+│   │   └── AppToast.vue       # 轻提示
+│   └── utils/time.js          # 相对时间纯函数
+├── tests/                     # Vitest 测试（先于实现编写）
+│   ├── setup.js               # 测试环境修复（Node 实验性 localStorage 遮蔽问题）
+│   ├── utils/time.spec.js
+│   ├── stores/posts.spec.js
+│   ├── stores/toast.spec.js
+│   └── components/*.spec.js   # Composer / ChannelBar / PostCard / App 集成
+└── legacy-static/             # 旧版纯静态实现（保留存档）
 ```
 
-代码分层：
+## TDD 实践说明
 
-- **Store**：`loadPosts()` / `savePosts()`，唯一读写 `localStorage` 的入口，负责数据校验与异常降级
-- **Format**：`formatRelativeTime()` 纯函数，时间展示单点可调
-- **Render**：`renderList()` / `updateCounter()`，只做 DOM 更新，正文统一用 `textContent` 输出，天然防注入
-- **Controller**：`handleSubmit()` 串联「校验 → 生成对象 → 持久化 → 重绘 → 清空输入」
+按「先写测试（红）→ 最小实现（绿）」推进，测试共 7 个套件 / 45 个用例：
 
-## 数据结构
+| 层 | 测试内容 |
+| --- | --- |
+| `utils/time` | 相对时间边界（刚刚 / 分钟 / 小时 / 天 / 日期）、补零 |
+| `stores/posts` | 空数据、倒序、旧数据补 channel、损坏数据降级、脏数据剔除、发布校验/截断/去空白、存储失败标记 `storageBroken`、频道过滤 |
+| `stores/toast` | 显示/自动隐藏、连续 show 复用定时器、立即隐藏 |
+| `components/Composer` | 按钮禁用态、实时计数、警示样式、提交写入 store 并清空、频道切换 |
+| `components/ChannelBar` | 页签渲染与高亮、aria-selected、计数实时性 |
+| `components/PostCard` | 纯文本插值防注入、换行保留、频道回退 |
+| `components/App` | 集成：发布渲染、计数联动、空频道文案、重新挂载模拟刷新的持久化 |
 
-存储键：`treehole.posts.v1`，值为 JSON 数组（按 `createdAt` 倒序）：
+> 环境备注：Node 26 的实验性全局 `localStorage`（未启用文件时恒为 undefined）会遮蔽 jsdom 实现，
+> `tests/setup.js` 注入内存版 Web Storage 解决，浏览器中不受影响。
+
+## 架构与数据流
+
+```
+用户输入 → Composer（校验/计数）→ posts store.publish()
+  → 内存数组 unshift → savePosts() 写 LocalStorage → visiblePosts 重算 → PostList 重绘
+频道切换 → store.setChannel(id) → visiblePosts 过滤
+```
+
+- **posts store** 是唯一读写 `localStorage` 的地方；组件不直接触碰存储。
+- **PostCard** 是纯 props 展示组件，正文用插值（纯文本）输出，天然防注入。
+- 存储键 `treehole.posts.v1`，值结构：
 
 ```json
 [
@@ -76,25 +115,17 @@
 ]
 ```
 
-- `channel` 取值：`shade`（树荫）/ `night`（深夜）/ `breeze`（微风），缺省视为 `shade`
-- 旧版本数据没有该字段，读取时自动补全，无需迁移
-
-## 技术说明
-
-- 零依赖、零构建：不引入框架、UI 库或 CDN，所有样式与交互手写，断网也可正常使用。
-- 状态以内存数组为准，`LocalStorage` 仅作持久层，写入失败不会阻断页面渲染。
-- 动效只使用 `transform` / `opacity`，并遵循 `prefers-reduced-motion`。
-- 页面文案与代码中不出现任何第三方社交平台名称。
+`channel` 取值：`shade`（树荫）/ `night`（深夜）/ `breeze`（微风），缺省视为 `shade`；旧数据读取时自动补全。
 
 ## 作业要求对应
 
 | 作业要求 | 实现情况 |
 | --- | --- |
-| 用纯 HTML + CSS + JavaScript 实现简单版社交信息流 | `index.html` / `styles.css` / `app.js`，无框架、无构建 |
+| 以 TDD 方式实现 | 测试先于实现编写（红 → 绿），Vitest + @vue/test-utils + jsdom，45 个用例 |
+| 使用 Node.js + Vue 3 和 Pinia | Vite 工程，SFC 组件 + Pinia store |
+| 使用 Local Storage 实现数据存储 | `treehole.posts.v1` 键，含校验与异常降级 |
 | 不含第三方社交平台字样 | 全站使用「树洞 / Tree Hole」 |
-| 使用 LocalStorage 本地化存储 | `treehole.posts.v1` 键，含读取校验与异常降级 |
-| 支持发布、查看功能，保证最小可用 | 发布表单 + 倒序时间线 + 空状态 + 持久化 |
-| 使用 Git 版本管理并推送到 GitHub | 本仓库由 Git 管理，已推送远程仓库 |
+| Git 版本管理并推送 GitHub | 全部提交已推送远程仓库 |
 
 ## 许可
 

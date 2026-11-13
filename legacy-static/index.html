@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>树洞 · Tree Hole</title>
+  <meta name="description" content="树洞 Tree Hole —— 把心事交给安静的风。匿名留言小站，内容只保存在你自己的浏览器里。">
+  <meta name="theme-color" content="#EFF7E1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%233E6B34'/%3E%3Cpath d='M24 7c-9 0-15 4.6-15 12 0 2 .7 3.8 1.8 5.2C13.6 18 18 14 24 11.7c-5 3.4-8.8 7.3-10.9 13' stroke='%23CBE3A8' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <script src="assets/js/app.js" defer></script>
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <span class="backdrop__blob backdrop__blob--mint"></span>
+    <span class="backdrop__blob backdrop__blob--sage"></span>
+    <span class="backdrop__blob backdrop__blob--cream"></span>
+    <span class="leaf leaf--a"></span>
+    <span class="leaf leaf--b"></span>
+    <span class="leaf leaf--c"></span>
+  </div>
+
+  <div class="page">
+    <header class="hero">
+      <p class="hero__badge">
+        <span class="hero__badge-dot" aria-hidden="true"></span>
+        匿名 · 只存在本地
+      </p>
+
+      <div class="hero__title-wrap">
+        <h1 class="hero__title">树洞</h1>
+        <svg class="hero__swoosh" viewBox="0 0 240 18" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="swooshGrad" x1="0" y1="0" x2="240" y2="0">
+              <stop stop-color="#A8CC8B"/>
+              <stop offset="1" stop-color="#6E9C55" stop-opacity="0.15"/>
+            </linearGradient>
+          </defs>
+          <path d="M5 12c32-7 72-10 113-7 40 3 78 8 117 2" stroke="url(#swooshGrad)" stroke-width="7" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <p class="hero__subtitle">把心事交给安静的风</p>
+      <p class="hero__count"><strong id="voiceCount">0</strong> 条声音已被收下</p>
+    </header>
+
+    <main>
+      <nav class="feedbar" aria-label="频道切换">
+        <div class="feedbar__tabs" role="tablist">
+          <button class="feedbar__tab is-active" type="button" role="tab" aria-selected="true" data-channel="all">全部</button>
+          <button class="feedbar__tab" type="button" role="tab" aria-selected="false" data-channel="shade">树荫</button>
+          <button class="feedbar__tab" type="button" role="tab" aria-selected="false" data-channel="night">深夜</button>
+          <button class="feedbar__tab" type="button" role="tab" aria-selected="false" data-channel="breeze">微风</button>
+        </div>
+        <span class="feedbar__count" id="feedCount" aria-live="polite">0 条</span>
+      </nav>
+
+      <form class="composer" id="composerForm" novalidate>
+        <div class="composer__head">
+          <span class="composer__avatar" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
+              <path d="M19.5 3.5c-8.2 0-13.6 4.2-13.6 11 0 1.9.6 3.5 1.6 4.8 3-6 7.2-9.6 12.2-11.6-4.2 3-7.4 6.4-9.4 11.4 1.1.5 2.3.7 3.6.7 6.2 0 9.6-6.2 9.6-16.3Z" fill="currentColor"/>
+            </svg>
+          </span>
+          <label class="composer__label" for="postContent">这一刻，想说什么？</label>
+        </div>
+
+        <div class="composer__channels" role="group" aria-label="选择投向的频道">
+          <span class="composer__channels-label">投向</span>
+          <button class="chip is-active" type="button" data-channel="shade">树荫</button>
+          <button class="chip" type="button" data-channel="night">深夜</button>
+          <button class="chip" type="button" data-channel="breeze">微风</button>
+        </div>
+
+        <textarea id="postContent" name="content" rows="3" maxlength="300"
+                  placeholder="这里没有熟人，说说今天的事……"></textarea>
+
+        <div class="composer__footer">
+          <span class="char-count" id="charCount" aria-live="polite">0 / 300</span>
+          <button class="btn-primary" id="submitBtn" type="submit" disabled>
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
+              <path d="M21 3 10.5 13.5M21 3l-6.8 18-3.7-7.5L3 9.8 21 3Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>投进树洞</span>
+          </button>
+        </div>
+      </form>
+
+      <section class="timeline" aria-labelledby="timelineTitle">
+        <div class="timeline__head">
+          <h2 id="timelineTitle"><span class="timeline__dot" aria-hidden="true"></span>洞里的声音</h2>
+          <span class="timeline__hint">最新在前</span>
+        </div>
+
+        <ul class="post-list" id="postList"></ul>
+
+        <div class="empty" id="emptyState">
+          <div class="empty__art">
+            <svg class="empty__tree" viewBox="0 0 160 140" role="img" aria-label="一棵安静的树">
+              <defs>
+                <linearGradient id="canopyGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#B4D496"/>
+                  <stop offset="100%" stop-color="#3E6B34"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="80" cy="130" rx="44" ry="6" fill="#3E6B34" opacity="0.09"/>
+              <path d="M80 128V84" stroke="#6E9C55" stroke-width="5" stroke-linecap="round"/>
+              <path d="M80 100l-14-10M80 108l14-11" stroke="#6E9C55" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="80" cy="60" r="33" fill="url(#canopyGrad)" opacity="0.95"/>
+              <circle cx="51" cy="76" r="21" fill="url(#canopyGrad)" opacity="0.75"/>
+              <circle cx="109" cy="78" r="19" fill="url(#canopyGrad)" opacity="0.7"/>
+              <circle cx="82" cy="38" r="17" fill="#A8CC8B" opacity="0.7"/>
+            </svg>
+          </div>
+          <h3 id="emptyTitle">这里还很安静</h3>
+          <p id="emptyDesc">说第一句吧，风会替你记着。</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" id="about">
+      <p>内容仅保存在此设备的浏览器中，不会上传到任何地方。</p>
+      <p class="site-footer__meta">Tree Hole · 原生 HTML / CSS / JavaScript</p>
+    </footer>
+  </div>
+
+  <nav class="dock" aria-label="快捷导航">
+    <button class="dock__item" type="button" data-action="top">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 10.6 12 4l8 6.6V20a1 1 0 0 1-1 1h-4.6v-6.2H9.6V21H5a1 1 0 0 1-1-1v-9.4Z" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>回到洞顶</span>
+    </button>
+
+    <button class="dock__item dock__item--primary" type="button" data-action="compose">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" stroke-linecap="round"/>
+      </svg>
+      <span>写一条</span>
+    </button>
+
+    <button class="dock__item" type="button" data-action="about">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5"/>
+        <path d="M12 11v5.5M12 7.8h.01" stroke-linecap="round"/>
+      </svg>
+      <span>关于</span>
+    </button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

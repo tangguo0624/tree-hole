@@ -1,0 +1,41 @@
+<script setup>
+import { usePostsStore } from './stores/posts'
+import SiteHero from './components/SiteHero.vue'
+import ChannelBar from './components/ChannelBar.vue'
+import Composer from './components/Composer.vue'
+import PostList from './components/PostList.vue'
+import AppDock from './components/AppDock.vue'
+import AppToast from './components/AppToast.vue'
+
+const store = usePostsStore()
+store.load()
+</script>
+
+<template>
+  <div class="backdrop" aria-hidden="true">
+    <span class="backdrop__blob backdrop__blob--mint"></span>
+    <span class="backdrop__blob backdrop__blob--sage"></span>
+    <span class="backdrop__blob backdrop__blob--cream"></span>
+    <span class="leaf leaf--a"></span>
+    <span class="leaf leaf--b"></span>
+    <span class="leaf leaf--c"></span>
+  </div>
+
+  <div class="page">
+    <SiteHero />
+
+    <main>
+      <ChannelBar />
+      <Composer />
+      <PostList />
+    </main>
+
+    <footer class="site-footer" id="about">
+      <p>内容仅保存在此设备的浏览器中，不会上传到任何地方。</p>
+      <p class="site-footer__meta">Tree Hole · Vue 3 / Pinia / LocalStorage</p>
+    </footer>
+  </div>
+
+  <AppDock />
+  <AppToast />
+</template>
