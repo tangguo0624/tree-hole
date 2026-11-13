@@ -28,3 +28,6 @@ agent/
 
 # 本地验收与交接文档（保留在本机，不入库）
 docs/
+
+# 并行开发的 git worktree 目录（各自复用一个 node_modules，不入库）
+.worktrees/
