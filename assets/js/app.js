@@ -23,7 +23,8 @@
     empty: document.getElementById('emptyState'),
     count: document.getElementById('voiceCount'),
     toast: document.getElementById('toast'),
-    header: document.querySelector('.site-header')
+    dock: document.querySelector('.dock'),
+    about: document.getElementById('about')
   };
 
   var posts = [];
@@ -208,9 +209,37 @@
     showToast(storageBroken ? '已投进树洞（未写入本地存储）' : '已投进树洞，叶子替你说完了');
   }
 
-  function handleHeaderShadow() {
-    if (!els.header) return;
-    els.header.classList.toggle('is-stuck', window.scrollY > 8);
+  function handleScrollState() {
+    document.body.classList.toggle('is-scrolled', window.scrollY > 80);
+  }
+
+  function initDock() {
+    window.addEventListener('scroll', handleScrollState, { passive: true });
+    handleScrollState();
+
+    if (!els.dock) return;
+
+    els.dock.addEventListener('click', function (event) {
+      var trigger = event.target.closest('[data-action]');
+      if (!trigger) return;
+
+      var action = trigger.dataset.action;
+
+      if (action === 'top') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      if (action === 'compose') {
+        els.input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        els.input.focus({ preventScroll: true });
+        return;
+      }
+
+      if (action === 'about' && els.about) {
+        els.about.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
   }
 
   function init() {
@@ -231,8 +260,7 @@
       }
     });
 
-    window.addEventListener('scroll', handleHeaderShadow, { passive: true });
-    handleHeaderShadow();
+    initDock();
 
     window.setInterval(refreshTimes, MINUTE);
     window.addEventListener('focus', refreshTimes);
