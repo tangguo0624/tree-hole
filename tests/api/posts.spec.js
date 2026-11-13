@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createPostsApi, postsApi, ApiError } from '../../src/api/posts'
-import { getVisitorId } from '../../src/utils/visitor'
+import { getVisitorId, VISITOR_STORAGE_KEY } from '../../src/utils/visitor'
 
 let fetchMock
 let api
@@ -180,6 +180,29 @@ describe('createPostsApi / 访客标识', () => {
     expect(visitorIds[0]).toBeTruthy()
     expect(visitorIds[1]).toBe(visitorIds[0])
     expect(visitorIds[2]).toBe(visitorIds[0])
+  })
+
+  it('标识写入 sessionStorage，刷新（重新加载模块）后复用同一个身份', async () => {
+    sessionStorage.clear()
+    vi.resetModules()
+
+    const first = (await import('../../src/utils/visitor')).getVisitorId()
+    expect(sessionStorage.getItem(VISITOR_STORAGE_KEY)).toBe(first)
+
+    // 模拟刷新：模块缓存被清空，但仍应读到同一份会话标识
+    vi.resetModules()
+    const reloaded = (await import('../../src/utils/visitor')).getVisitorId()
+    expect(reloaded).toBe(first)
+  })
+
+  it('sessionStorage 里是空白脏数据时重新生成并覆盖', async () => {
+    sessionStorage.setItem(VISITOR_STORAGE_KEY, '   ')
+    vi.resetModules()
+
+    const id = (await import('../../src/utils/visitor')).getVisitorId()
+
+    expect(id.trim()).toBeTruthy()
+    expect(sessionStorage.getItem(VISITOR_STORAGE_KEY)).toBe(id)
   })
 })
 
