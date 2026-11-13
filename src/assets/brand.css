@@ -1,0 +1,188 @@
+/* ==========================================================================
+   树洞 · 手写品牌字（BrandWordmark）
+   与 styles.css 解耦：本文件只负责「树洞」标题的马克笔质感与涂鸦装饰。
+   ========================================================================== */
+
+/* 子集字体：仅含「树」「洞」两字（892 字节），由 fonts.gstatic.cn 的 text= 子集接口取得，
+   自托管后首屏无需等待第三方域名；unicode-range 限定范围，其它字符自动回退到本地字体栈。 */
+@font-face {
+  font-family: 'ZCOOL KuaiLe';
+  src: url('./fonts/zcool-kuaile-shudong.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+6811, U+6D1E;
+}
+
+/* --------------------------------------------------------------------------
+   容器与字身
+   -------------------------------------------------------------------------- */
+.wordmark {
+  /* 单一字号基准：内部所有 em 都按它缩放；移动端 21vw 的量级能保证两字横排不溢出 */
+  --wordmark-size: clamp(64px, 21vw, 104px);
+  --wordmark-ink: #2C4327;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: var(--wordmark-size);
+  line-height: 1;
+  text-align: center;
+}
+
+.wordmark__stage {
+  position: relative;
+  display: inline-block;
+  /* 底部留白给波浪线与藤蔓，避免装饰压住字形 */
+  padding: 0.06em 0.04em 0.2em;
+  white-space: nowrap;
+}
+
+/* 覆盖 styles.css 里 .hero__title 的渐变文字（该 class 保留供集成测试选择），
+   提高一级选择器权重，保证与 styles.css 的加载顺序无关。 */
+.wordmark .wordmark__title {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-family: 'ZCOOL KuaiLe', 'Ma Shan Zheng', 'STXingkai', 'KaiTi', cursive;
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  text-indent: 0;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--wordmark-ink);
+  -webkit-text-fill-color: currentColor;
+  filter: none;
+}
+
+.wordmark__char {
+  display: inline-block;
+  font-size: 1em;
+  color: var(--wordmark-ink);
+  /* 墨迹抖动：只在 1.5px 量级，读取不成问题，但笔画边缘不再像矢量一样“太干净” */
+  filter: url(#wordmark-ink);
+}
+
+/* 第一字左倾、略低 */
+.wordmark__char--shu {
+  transform: rotate(-8deg) translateY(0.05em);
+}
+
+/* 第二字右倾、更大、更靠上，且向左压一点形成重叠 */
+.wordmark__char--dong {
+  margin-left: -0.08em;
+  font-size: 1.12em;
+  transform: rotate(5deg) translateY(-0.06em);
+}
+
+/* --------------------------------------------------------------------------
+   涂鸦装饰（均为 aria-hidden 的内联 SVG）
+   -------------------------------------------------------------------------- */
+.wordmark__filter {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.wordmark__flower {
+  position: absolute;
+  top: -0.04em;
+  right: 0;
+  width: 0.6em;
+  height: auto;
+  transform-origin: 40% 92%;
+}
+
+.wordmark__dot {
+  position: absolute;
+  left: 0.02em;
+  bottom: 0.14em;
+  width: 0.13em;
+  height: auto;
+  opacity: 0.9;
+}
+
+.wordmark__wave {
+  position: absolute;
+  left: 1%;
+  bottom: 0;
+  width: 98%;
+  height: auto;
+}
+
+/* 藤蔓压在字形之下，像从字脚后面穿过去 */
+.wordmark__vine {
+  position: absolute;
+  left: -2%;
+  bottom: 0.1em;
+  width: 104%;
+  height: auto;
+  z-index: 0;
+  opacity: 0.55;
+}
+
+/* --------------------------------------------------------------------------
+   英文副标题
+   -------------------------------------------------------------------------- */
+.wordmark__tagline {
+  margin: 0.55em 0 0;
+  font-family: var(--font-base, system-ui, sans-serif);
+  font-size: clamp(9.5px, 2.6vw, 11.5px);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.3em;
+  /* 末字母后的字距会让整行偏左，补一个缩进找回视觉居中 */
+  text-indent: 0.3em;
+  text-transform: lowercase;
+  color: var(--ink-600, #5C6B55);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   响应式与动效
+   -------------------------------------------------------------------------- */
+@media (max-width: 420px) {
+  .wordmark {
+    --wordmark-size: clamp(58px, 20vw, 84px);
+  }
+
+  .wordmark__tagline {
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+  }
+}
+
+/* 仅有「允许动效」偏好时才让小花与藤蔓轻轻起伏，reduced-motion 下保持完全静止 */
+@media (prefers-reduced-motion: no-preference) {
+  .wordmark__flower {
+    animation: wordmark-sway 7.5s ease-in-out infinite alternate;
+  }
+
+  .wordmark__wave {
+    animation: wordmark-drift 9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes wordmark-sway {
+  from {
+    transform: rotate(-2.4deg);
+  }
+
+  to {
+    transform: rotate(1.8deg);
+  }
+}
+
+@keyframes wordmark-drift {
+  from {
+    transform: translateX(-1.5px);
+  }
+
+  to {
+    transform: translateX(1.5px);
+  }
+}
