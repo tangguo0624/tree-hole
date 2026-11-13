@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createPostStore, CHANNELS, MAX_CONTENT_LENGTH } from '../../server/store.js'
+import {
+  createPostStore,
+  normalizeVisitorId,
+  CHANNELS,
+  DEFAULT_VISITOR,
+  MAX_CONTENT_LENGTH
+} from '../../server/store.js'
 
 /** 构造带确定性 now / idFactory 的 store */
 function makeStore(options = {}) {
@@ -48,7 +54,11 @@ describe('createPostStore', () => {
       id: 'id-1',
       content: '第一句',
       createdAt: 1_700_000_000_001,
-      channel: 'night'
+      channel: 'night',
+      likes: 0,
+      favorites: 0,
+      liked: false,
+      favorited: false
     })
     expect(store.get('id-1')).toEqual(created)
   })
@@ -128,5 +138,133 @@ describe('createPostStore', () => {
     store.get(created.id).content = '被改掉'
 
     expect(store.get(created.id).content).toBe('原始')
+  })
+})
+
+describe('normalizeVisitorId', () => {
+  it('导出默认访客常量', () => {
+    expect(DEFAULT_VISITOR).toBe('anonymous')
+  })
+
+  it('去首尾空白，长度 1–64 视为有效', () => {
+    expect(normalizeVisitorId('  alice  ')).toBe('alice')
+    expect(normalizeVisitorId('a')).toBe('a')
+    expect(normalizeVisitorId('a'.repeat(64))).toBe('a'.repeat(64))
+  })
+
+  it('缺失 / 空白 / 超长 / 非字符串一律归一为 anonymous', () => {
+    expect(normalizeVisitorId()).toBe('anonymous')
+    expect(normalizeVisitorId(undefined)).toBe('anonymous')
+    expect(normalizeVisitorId(null)).toBe('anonymous')
+    expect(normalizeVisitorId('')).toBe('anonymous')
+    expect(normalizeVisitorId('   \t\n ')).toBe('anonymous')
+    expect(normalizeVisitorId('a'.repeat(65))).toBe('anonymous')
+    expect(normalizeVisitorId(42)).toBe('anonymous')
+    expect(normalizeVisitorId({ id: 'x' })).toBe('anonymous')
+  })
+})
+
+describe('点赞 / 收藏（访客态）', () => {
+  let store
+  let postId
+
+  beforeEach(() => {
+    store = makeStore()
+    postId = store.create({ content: '可互动的树洞', channel: 'shade' }).id
+  })
+
+  it('toggleLike 第一次点赞，第二次取消，回到原值', () => {
+    const liked = store.toggleLike(postId, 'alice')
+    expect(liked).toMatchObject({ likes: 1, liked: true })
+
+    const unliked = store.toggleLike(postId, 'alice')
+    expect(unliked).toMatchObject({ likes: 0, liked: false })
+  })
+
+  it('toggleFavorite 与点赞互相独立', () => {
+    store.toggleLike(postId, 'alice')
+    const favorited = store.toggleFavorite(postId, 'alice')
+
+    expect(favorited).toMatchObject({ likes: 1, liked: true, favorites: 1, favorited: true })
+
+    const unliked = store.toggleLike(postId, 'alice')
+    expect(unliked).toMatchObject({ likes: 0, liked: false, favorites: 1, favorited: true })
+  })
+
+  it('不同访客的点赞 / 收藏互不影响', () => {
+    store.toggleLike(postId, 'alice')
+    store.toggleFavorite(postId, 'bob')
+
+    expect(store.get(postId, 'alice')).toMatchObject({ likes: 1, liked: true, favorites: 1, favorited: false })
+    expect(store.get(postId, 'bob')).toMatchObject({ likes: 1, liked: false, favorites: 1, favorited: true })
+    expect(store.get(postId, 'carol')).toMatchObject({ likes: 1, liked: false, favorites: 1, favorited: false })
+  })
+
+  it('缺失 visitorId 归一为 anonymous，与显式 anonymous 共享状态', () => {
+    store.toggleLike(postId)
+    expect(store.get(postId).liked).toBe(true)
+    expect(store.get(postId, DEFAULT_VISITOR).liked).toBe(true)
+
+    const again = store.toggleLike(postId, DEFAULT_VISITOR)
+    expect(again).toMatchObject({ likes: 0, liked: false })
+  })
+
+  it('visitorId 首尾空白被归一，同一个访客不会重复计数', () => {
+    store.toggleLike(postId, '  alice  ')
+    const again = store.toggleLike(postId, 'alice')
+
+    expect(again).toMatchObject({ likes: 0, liked: false })
+  })
+
+  it('toggle 未命中返回 undefined 且不产生幽灵条目', () => {
+    expect(store.toggleLike('missing', 'alice')).toBeUndefined()
+    expect(store.toggleFavorite('missing', 'alice')).toBeUndefined()
+    expect(store.list()).toHaveLength(1)
+  })
+
+  it('计数不为负：重复取消后仍为 0，未知访客取消也不会变负', () => {
+    store.toggleLike(postId, 'alice')
+    store.toggleLike(postId, 'alice')
+    store.toggleFavorite(postId, 'ghost')
+    store.toggleFavorite(postId, 'ghost')
+
+    expect(store.get(postId, 'alice')).toMatchObject({ likes: 0, favorites: 0 })
+  })
+
+  it('list 按访客返回不同的 liked / favorited', () => {
+    store.toggleLike(postId, 'alice')
+
+    expect(store.list({ visitorId: 'alice' })[0]).toMatchObject({ likes: 1, liked: true })
+    expect(store.list({ visitorId: 'bob' })[0]).toMatchObject({ likes: 1, liked: false })
+    expect(store.list({ channel: 'shade', visitorId: 'bob' })[0].liked).toBe(false)
+    expect(store.list()[0].liked).toBe(false)
+  })
+
+  it('返回的是副本：外部改计数不会污染内部 Set', () => {
+    const liked = store.toggleLike(postId, 'alice')
+    liked.likes = 999
+    liked.liked = false
+
+    expect(store.get(postId, 'alice')).toMatchObject({ likes: 1, liked: true })
+  })
+
+  it('remove 后重建同 id 的帖子，访客集合已随条目丢弃', () => {
+    const recycled = makeStore({ ids: ['same-id', 'same-id'] })
+    recycled.create({ content: '第一世' })
+    recycled.toggleLike('same-id', 'alice')
+
+    expect(recycled.remove('same-id')).toBe(true)
+
+    const reborn = recycled.create({ content: '第二世' })
+    expect(reborn).toMatchObject({ id: 'same-id', likes: 0, favorites: 0, liked: false, favorited: false })
+    expect(recycled.get('same-id', 'alice')).toMatchObject({ likes: 0, liked: false })
+  })
+
+  it('reset 后访客集合一并清空', () => {
+    store.toggleLike(postId, 'alice')
+    store.reset()
+    store.create({ content: '新的一页' })
+
+    expect(store.list({ visitorId: 'alice' })[0]).toMatchObject({ likes: 0, liked: false })
   })
 })

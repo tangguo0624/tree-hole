@@ -120,7 +120,11 @@ describe('POST /api/posts', () => {
       id: 'id-1',
       content: '你好，树洞',
       createdAt: 1_700_000_000_001,
-      channel: 'night'
+      channel: 'night',
+      likes: 0,
+      favorites: 0,
+      liked: false,
+      favorited: false
     })
   })
 
@@ -279,7 +283,16 @@ describe('边界与防御性用例', () => {
     )
 
     const { post } = await response.json()
-    expect(Object.keys(post).sort()).toEqual(['channel', 'content', 'createdAt', 'id'])
+    expect(Object.keys(post).sort()).toEqual([
+      'channel',
+      'content',
+      'createdAt',
+      'favorited',
+      'favorites',
+      'id',
+      'liked',
+      'likes'
+    ])
   })
 
   it('204 响应无 body 且不带 JSON Content-Type', async () => {
@@ -298,6 +311,178 @@ describe('边界与防御性用例', () => {
 
     await app.request(`/api/posts/${created.id}`, { method: 'DELETE' })
     await expectError(await app.request(`/api/posts/${created.id}`, { method: 'DELETE' }), 404, 'NOT_FOUND')
+  })
+})
+
+describe('POST /api/posts/:id/like', () => {
+  /** toggle 接口无请求体，只靠 X-Visitor-Id 头区分访客 */
+  const toggleInit = (visitorId) => ({
+    method: 'POST',
+    headers: visitorId === undefined ? {} : { 'X-Visitor-Id': visitorId }
+  })
+
+  it('点赞成功返回 200 与完整访客态 Post', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '点我' })
+
+    const response = await app.request(`/api/posts/${created.id}/like`, toggleInit('alice'))
+
+    expect(response.status).toBe(200)
+    const { post } = await response.json()
+    expect(post).toEqual({
+      id: created.id,
+      content: '点我',
+      createdAt: created.createdAt,
+      channel: 'shade',
+      likes: 1,
+      favorites: 0,
+      liked: true,
+      favorited: false
+    })
+  })
+
+  it('再次调用取消点赞（toggle 幂等安全）', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '再来一次' })
+
+    await app.request(`/api/posts/${created.id}/like`, toggleInit('alice'))
+    const { post } = await (await app.request(`/api/posts/${created.id}/like`, toggleInit('alice'))).json()
+
+    expect(post).toMatchObject({ likes: 0, liked: false })
+  })
+
+  it('不同访客的点赞互不影响，各自看到自己的 liked', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '两个访客' })
+
+    await app.request(`/api/posts/${created.id}/like`, toggleInit('alice'))
+
+    const forAlice = await (await app.request(`/api/posts/${created.id}`, { headers: { 'X-Visitor-Id': 'alice' } })).json()
+    const forBob = await (await app.request(`/api/posts/${created.id}`, { headers: { 'X-Visitor-Id': 'bob' } })).json()
+
+    expect(forAlice.post).toMatchObject({ likes: 1, liked: true })
+    expect(forBob.post).toMatchObject({ likes: 1, liked: false })
+  })
+
+  it('缺失 X-Visitor-Id 归一到 anonymous', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '匿名访客' })
+
+    await app.request(`/api/posts/${created.id}/like`, toggleInit())
+    const anonymous = await (await app.request(`/api/posts/${created.id}`)).json()
+
+    expect(anonymous.post).toMatchObject({ likes: 1, liked: true })
+
+    // 显式 anonymous 与缺失头是同一个人，再点一次应取消
+    const explicit = await (await app.request(`/api/posts/${created.id}/like`, toggleInit('anonymous'))).json()
+    expect(explicit.post).toMatchObject({ likes: 0, liked: false })
+  })
+
+  it('超长 X-Visitor-Id 归一为 anonymous', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '超长标识' })
+
+    const response = await app.request(`/api/posts/${created.id}/like`, toggleInit('a'.repeat(65)))
+    const { post } = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(post).toMatchObject({ likes: 1, liked: true })
+
+    const anonymous = await (await app.request(`/api/posts/${created.id}`)).json()
+    expect(anonymous.post.liked).toBe(true)
+  })
+
+  it('未命中返回 404 NOT_FOUND 与中文文案', async () => {
+    const { app } = setup()
+    const response = await app.request('/api/posts/missing/like', toggleInit('alice'))
+
+    expect(response.status).toBe(404)
+    const payload = await response.json()
+    expect(payload.error.code).toBe('NOT_FOUND')
+    expect(payload.error.message).toMatch(/[\u4e00-\u9fa5]/)
+  })
+
+  it('忽略请求体中的计数，服务端自己派生', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '别想篡改' })
+
+    const response = await app.request(`/api/posts/${created.id}/like`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Visitor-Id': 'alice' },
+      body: JSON.stringify({ likes: 99, liked: true })
+    })
+
+    await expect(response.json()).resolves.toMatchObject({ post: { likes: 1, liked: true } })
+  })
+})
+
+describe('POST /api/posts/:id/favorite', () => {
+  const toggleInit = (visitorId) => ({
+    method: 'POST',
+    headers: visitorId === undefined ? {} : { 'X-Visitor-Id': visitorId }
+  })
+
+  it('收藏成功返回 200 与完整访客态 Post', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '收藏我' })
+
+    const response = await app.request(`/api/posts/${created.id}/favorite`, toggleInit('alice'))
+    const { post } = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(post).toMatchObject({ likes: 0, liked: false, favorites: 1, favorited: true })
+  })
+
+  it('再次调用取消收藏', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '取消收藏' })
+
+    await app.request(`/api/posts/${created.id}/favorite`, toggleInit('alice'))
+    const { post } = await (await app.request(`/api/posts/${created.id}/favorite`, toggleInit('alice'))).json()
+
+    expect(post).toMatchObject({ favorites: 0, favorited: false })
+  })
+
+  it('收藏与点赞互不覆盖', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '两件事都要' })
+
+    await app.request(`/api/posts/${created.id}/like`, toggleInit('alice'))
+    const { post } = await (await app.request(`/api/posts/${created.id}/favorite`, toggleInit('alice'))).json()
+
+    expect(post).toMatchObject({ likes: 1, liked: true, favorites: 1, favorited: true })
+  })
+
+  it('未命中返回 404 NOT_FOUND', async () => {
+    const { app } = setup()
+    await expectError(await app.request('/api/posts/missing/favorite', toggleInit('alice')), 404, 'NOT_FOUND')
+  })
+})
+
+describe('列表 / 详情的访客态', () => {
+  it('GET 列表按 X-Visitor-Id 返回不同 liked / favorited', async () => {
+    const { app, store } = setup()
+    const created = store.create({ content: '列表态' })
+
+    await app.request(`/api/posts/${created.id}/like`, { method: 'POST', headers: { 'X-Visitor-Id': 'alice' } })
+    await app.request(`/api/posts/${created.id}/favorite`, { method: 'POST', headers: { 'X-Visitor-Id': 'bob' } })
+
+    const forAlice = await (await app.request('/api/posts', { headers: { 'X-Visitor-Id': 'alice' } })).json()
+    const forBob = await (await app.request('/api/posts', { headers: { 'X-Visitor-Id': 'bob' } })).json()
+    const anonymous = await (await app.request('/api/posts')).json()
+
+    expect(forAlice.posts[0]).toMatchObject({ likes: 1, liked: true, favorites: 1, favorited: false })
+    expect(forBob.posts[0]).toMatchObject({ likes: 1, liked: false, favorites: 1, favorited: true })
+    expect(anonymous.posts[0]).toMatchObject({ likes: 1, liked: false, favorites: 1, favorited: false })
+  })
+
+  it('新建帖子的响应即带零计数与未激活状态', async () => {
+    const { app } = setup()
+    const response = await app.request('/api/posts', jsonInit({ content: '全新的' }))
+
+    await expect(response.json()).resolves.toMatchObject({
+      post: { likes: 0, favorites: 0, liked: false, favorited: false }
+    })
   })
 })
 
